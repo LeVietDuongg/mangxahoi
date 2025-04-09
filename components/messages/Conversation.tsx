@@ -28,19 +28,14 @@ export default function Conversation({ userId }: ConversationProps) {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [otherUserTyping, setOtherUserTyping] = useState(false);
-  const [otherUserOnline, setOtherUserOnline] = useState(false);
   const [otherUserInfo, setOtherUserInfo] = useState<{
     username: string;
     avatar_url?: string;
   } | null>(null);
   
-  const socketRef = useRef<Socket | null>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Fetch conversation history
+  // Mock fetch conversation
   const fetchMessages = async () => {
     if (!user) return;
     
@@ -48,122 +43,48 @@ export default function Conversation({ userId }: ConversationProps) {
       setLoading(true);
       setError('');
 
-      const response = await fetch(`/api/messages/${userId}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Không thể tải tin nhắn');
-      }
-
-      setMessages(data.messages.reverse()); // Reverse to show oldest first
-      
-      // Extract other user info from first message
-      if (data.messages.length > 0) {
-        const message = data.messages[0];
-        if (message.sender_id === userId) {
-          setOtherUserInfo({
-            username: message.sender_username || 'Người dùng',
-            avatar_url: message.sender_avatar_url
-          });
-        } else {
-          setOtherUserInfo({
-            username: message.receiver_username || 'Người dùng',
-            avatar_url: message.receiver_avatar_url
-          });
+      // In a real app, fetch from API
+      // For now, mock data
+      const mockMessages = [
+        {
+          id: 1,
+          sender_id: user.id,
+          receiver_id: userId,
+          content: "Hello there!",
+          is_read: true,
+          created_at: new Date(Date.now() - 3600000).toISOString(),
+          sender_username: user.username,
+          sender_avatar_url: user.avatar_url
+        },
+        {
+          id: 2,
+          sender_id: userId,
+          receiver_id: user.id,
+          content: "Hi! How are you?",
+          is_read: true,
+          created_at: new Date(Date.now() - 3000000).toISOString(),
+          sender_username: "User" + userId,
+          sender_avatar_url: undefined
         }
-      }
+      ];
+
+      setMessages(mockMessages);
+      
+      setOtherUserInfo({
+        username: "User" + userId,
+        avatar_url: undefined
+      });
+      
     } catch (error) {
       console.error('Fetch messages error:', error);
-      setError('Đã xảy ra lỗi khi tải tin nhắn');
+      setError('Failed to load messages');
     } finally {
       setLoading(false);
     }
   };
 
-  // Initialize Socket.IO connection
   useEffect(() => {
-    if (!user) return;
-    
-    // Connect to Socket.IO server
-    const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3000', {
-      auth: {
-        token: localStorage.getItem('auth_token')
-      }
-    });
-    
-    socketRef.current = socket;
-    
-    // Socket event handlers
-    socket.on('connect', () => {
-      console.log('Connected to Socket.IO server');
-    });
-    
-    socket.on('connect_error', (err) => {
-      console.error('Socket connection error:', err);
-      setError('Không thể kết nối đến máy chủ tin nhắn');
-    });
-    
-    socket.on('private_message', (message: Message) => {
-      if (
-        (message.sender_id === userId && message.receiver_id === user.id) ||
-        (message.sender_id === user.id && message.receiver_id === userId)
-      ) {
-        setMessages(prev => [...prev, message]);
-        
-        // Mark message as read if we are the receiver
-        if (message.sender_id === userId) {
-          socket.emit('message_read', { 
-            messageId: message.id,
-            senderId: message.sender_id
-          });
-        }
-      }
-    });
-    
-    socket.on('message_sent', (message: Message) => {
-      // Update UI with sent message confirmation
-      setMessages(prev => 
-        prev.map(m => 
-          m.id === message.id ? message : m
-        )
-      );
-    });
-    
-    socket.on('message_error', (error: { error: string }) => {
-      setError(error.error || 'Không thể gửi tin nhắn');
-    });
-    
-    socket.on('user_typing', ({ userId: typingUserId, isTyping }: { userId: number, isTyping: boolean }) => {
-      if (typingUserId === userId) {
-        setOtherUserTyping(isTyping);
-      }
-    });
-    
-    socket.on('user_status_change', ({ userId: statusUserId, status }: { userId: number, status: string }) => {
-      if (statusUserId === userId) {
-        setOtherUserOnline(status === 'online');
-      }
-    });
-    
-    socket.on('message_read', ({ messageId }: { messageId: number }) => {
-      // Update message read status
-      setMessages(prev => 
-        prev.map(m => 
-          m.id === messageId ? { ...m, is_read: true } : m
-        )
-      );
-    });
-    
-    // Fetch initial messages
     fetchMessages();
-    
-    // Cleanup on unmount
-    return () => {
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
-      socket.disconnect();
-    };
   }, [user, userId]);
 
   // Scroll to bottom when messages change
@@ -177,17 +98,11 @@ export default function Conversation({ userId }: ConversationProps) {
     if (!user || !newMessage.trim()) return;
     
     try {
-      // Send message via Socket.IO
-      socketRef.current?.emit('private_message', {
-        senderId: user.id,
-        receiverId: userId,
-        content: newMessage,
-        timestamp: new Date().toISOString()
-      });
+      // In a real app, this would send via API or socket
       
       // Optimistically add message to UI
-      const optimisticMessage: Message = {
-        id: Date.now(), // Temporary ID
+      const newMsg: Message = {
+        id: Date.now(),
         sender_id: user.id,
         receiver_id: userId,
         content: newMessage,
@@ -197,46 +112,17 @@ export default function Conversation({ userId }: ConversationProps) {
         sender_avatar_url: user.avatar_url
       };
       
-      setMessages(prev => [...prev, optimisticMessage]);
+      setMessages(prev => [...prev, newMsg]);
       setNewMessage('');
-      
-      // Stop typing indicator
-      handleStopTyping();
     } catch (error) {
       console.error('Send message error:', error);
-      setError('Không thể gửi tin nhắn');
-    }
-  };
-
-  const handleTyping = () => {
-    if (!isTyping) {
-      setIsTyping(true);
-      socketRef.current?.emit('typing', { receiverId: userId, isTyping: true });
-    }
-    
-    // Reset typing timeout
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
-    
-    typingTimeoutRef.current = setTimeout(handleStopTyping, 3000);
-  };
-
-  const handleStopTyping = () => {
-    if (isTyping) {
-      setIsTyping(false);
-      socketRef.current?.emit('typing', { receiverId: userId, isTyping: false });
-    }
-    
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-      typingTimeoutRef.current = null;
+      setError('Failed to send message');
     }
   };
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleTimeString('vi-VN', {
+    return date.toLocaleTimeString(undefined, {
       hour: '2-digit',
       minute: '2-digit'
     });
@@ -244,7 +130,7 @@ export default function Conversation({ userId }: ConversationProps) {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('vi-VN', {
+    return date.toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -254,7 +140,7 @@ export default function Conversation({ userId }: ConversationProps) {
   if (!user) {
     return (
       <div className="bg-white rounded-lg shadow-md p-6 my-4 text-center">
-        <p className="text-gray-500">Vui lòng đăng nhập để xem tin nhắn</p>
+        <p className="text-gray-500">Please login to view messages</p>
       </div>
     );
   }
@@ -278,16 +164,7 @@ export default function Conversation({ userId }: ConversationProps) {
             )}
           </div>
           <div>
-            <div className="font-semibold">{otherUserInfo?.username || 'Người dùng'}</div>
-            <div className="text-xs text-gray-500">
-              {otherUserTyping ? (
-                <span className="text-green-500">Đang nhập...</span>
-              ) : otherUserOnline ? (
-                <span className="text-green-500">Đang hoạt động</span>
-              ) : (
-                <span>Ngoại tuyến</span>
-              )}
-            </div>
+            <div className="font-semibold">{otherUserInfo?.username || 'User'}</div>
           </div>
         </Link>
       </div>
@@ -304,7 +181,7 @@ export default function Conversation({ userId }: ConversationProps) {
           </div>
         ) : messages.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
-            Chưa có tin nhắn nào. Hãy bắt đầu cuộc trò chuyện!
+            No messages yet. Start a conversation!
           </div>
         ) : (
           <div className="space-y-4">
@@ -341,21 +218,8 @@ export default function Conversation({ userId }: ConversationProps) {
                     )}
                     <div className={`max-w-[70%] ${isCurrentUser ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800'} rounded-lg px-4 py-2`}>
                       <div className="whitespace-pre-line">{message.content}</div>
-                      <div className={`text-xs mt-1 ${isCurrentUser ? 'text-blue-100' : 'text-gray-500'} flex items-center`}>
-                        <span>{formatTime(message.created_at)}</span>
-                        {isCurrentUser && (
-                          <span className="ml-1">
-                            {message.is_read ? (
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                              </svg>
-                            ) : (
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                              </svg>
-                            )}
-                          </span>
-                        )}
+                      <div className={`text-xs mt-1 ${isCurrentUser ? 'text-blue-100' : 'text-gray-500'}`}>
+                        {formatTime(message.created_at)}
                       </div>
                     </div>
                   </div>
@@ -373,20 +237,16 @@ export default function Conversation({ userId }: ConversationProps) {
           <input
             type="text"
             value={newMessage}
-            onChange={(e) => {
-              setNewMessage(e.target.value);
-              handleTyping();
-            }}
-            onBlur={handleStopTyping}
+            onChange={(e) => setNewMessage(e.target.value)}
             className="flex-1 px-4 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Nhập tin nhắn..."
+            placeholder="Type a message..."
           />
           <button
             type="submit"
             disabled={!newMessage.trim()}
             className="bg-blue-500 text-white px-4 py-2 rounded-r-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-blue-300"
           >
-            Gửi
+            Send
           </button>
         </form>
       </div>

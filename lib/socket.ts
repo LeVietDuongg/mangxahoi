@@ -2,7 +2,7 @@ import { io } from 'socket.io-client';
 import { useEffect, useState } from 'react';
 
 // Socket.IO client configuration for Railway
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://your-railway-app.railway.app';
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'https://backend-shop-production-83bd.up.railway.app/';
 
 let socket: any;
 

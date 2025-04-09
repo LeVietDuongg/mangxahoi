@@ -8,24 +8,28 @@ import type {
   ToastProps,
 } from "@/components/ui/toast"
 
-const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+// Add missing constants
+let count = 0;
+const TOAST_LIMIT = 100;
+const TOAST_REMOVE_DELAY = 1000 * 10;
 
-type ToasterToast = ToastProps & {
-  id: string
-  title?: React.ReactNode
-  description?: React.ReactNode
-  action?: ToastActionElement
-}
-
+// Define action types
 const actionTypes = {
-  ADD_TOAST: "ADD_TOAST",
-  UPDATE_TOAST: "UPDATE_TOAST",
-  DISMISS_TOAST: "DISMISS_TOAST",
-  REMOVE_TOAST: "REMOVE_TOAST",
-} as const
+  ADD_TOAST: 'ADD_TOAST',
+  UPDATE_TOAST: 'UPDATE_TOAST',
+  DISMISS_TOAST: 'DISMISS_TOAST',
+  REMOVE_TOAST: 'REMOVE_TOAST',
+} as const;
 
-let count = 0
+// Define missing ToasterToast type
+type ToasterToast = {
+  id: string;
+  open: boolean;
+  title?: string;
+  description?: string;
+  action?: React.ReactNode;
+  onOpenChange: (open: boolean) => void;
+}
 
 function genId() {
   count = (count + 1) % Number.MAX_SAFE_INTEGER
@@ -191,4 +195,4 @@ function useToast() {
   }
 }
 
-export { useToast, toast }
+export { useToast, toast, actionTypes }
