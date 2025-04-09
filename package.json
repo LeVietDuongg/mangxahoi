@@ -26,10 +26,4 @@
       "postcss": "^8.4.31",
       "tailwindcss": "^3.3.5"
     }
-    "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
-  }
-  }
+}
